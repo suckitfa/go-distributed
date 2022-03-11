@@ -2,6 +2,8 @@ package registry
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
@@ -23,6 +25,18 @@ func (r *registry) add(reg Registration) error {
 	r.registrations = append(r.registrations, reg)
 	r.mutext.Unlock()
 	return nil
+}
+
+func (r *registry) remove(url string) error {
+	for i := range r.registrations {
+		if reg.registrations[i].ServiceURL == url {
+			r.mutext.Lock()
+			// 删除index为i的元素
+			reg.registrations = append(reg.registrations[:i], r.registrations[:i+1]...)
+			r.mutext.Unlock()
+		}
+	}
+	return fmt.Errorf("no service found with URL: %s", url)
 }
 
 var reg = registry{
@@ -53,6 +67,21 @@ func (s RegistryService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// 记录日志
 			log.Println(err)
 			w.WriteHeader(http.StatusBadRequest)
+		}
+	case http.MethodDelete:
+		// 获取url
+		payload, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		url := string(payload)
+		err = reg.remove(url)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
