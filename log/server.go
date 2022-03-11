@@ -14,6 +14,7 @@ var log *stdlog.Logger
 type fileLog string
 
 func (fl fileLog) Write(data []byte) (int, error) {
+	fmt.Println("func Write in Log Server")
 	// 打开文件，写入模式，0666快平台权限
 	f, err := os.OpenFile(string(fl), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
@@ -26,7 +27,7 @@ func (fl fileLog) Write(data []byte) (int, error) {
 
 func Run(destination string) {
 	// 创建日志文件 ???
-	fmt.Printf("func Run in Log Server")
+	fmt.Println("func Run in Log Server")
 	log = stdlog.New(fileLog(destination), "go: ", stdlog.LstdFlags)
 }
 
@@ -51,6 +52,6 @@ func RegisterHandlers() {
 
 // 输出日志
 func write(message string) {
-	fmt.Printf("private func write  in Log Server")
+	fmt.Println("private func write  in Log Server")
 	log.Printf("%v\n", message)
 }
