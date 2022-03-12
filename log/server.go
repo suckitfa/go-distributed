@@ -28,7 +28,7 @@ func (fl fileLog) Write(data []byte) (int, error) {
 func Run(destination string) {
 	// 创建日志文件 ???
 	fmt.Println("func Run in Log Server")
-	log = stdlog.New(fileLog(destination), "go: ", stdlog.LstdFlags)
+	log = stdlog.New(fileLog(destination), "[go]: ", stdlog.LstdFlags)
 }
 
 // 注册处理函数
