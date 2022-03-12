@@ -67,7 +67,7 @@ func (r *registry) remove(url string) error {
 		if reg.registrations[i].ServiceURL == url {
 			r.mutext.Lock()
 			// 删除index为i的元素
-			reg.registrations = append(reg.registrations[:i], r.registrations[:i+1]...)
+			reg.registrations = append(reg.registrations[:i], r.registrations[i+1:]...)
 			r.mutext.Unlock()
 		}
 	}
