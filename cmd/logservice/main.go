@@ -2,24 +2,24 @@ package main
 
 import (
 	"context"
+	"distributed/log"
+	"distributed/registry"
+	"distributed/service"
 	"fmt"
-	stdlog "log"
-
-	"test.com/log"
-	"test.com/registry"
-	"test.com/service"
+	stlog "log"
 )
 
-// 日志模块的启动入口
 func main() {
 	log.Run("./distributed.log")
 	host, port := "localhost", "4000"
 	serviceAddress := fmt.Sprintf("http://%s:%s", host, port)
+
 	r := registry.Registration{
-		ServiceName:      "Log Service",
+		ServiceName:      registry.LogService,
 		ServiceURL:       serviceAddress,
 		RequiredServices: make([]registry.ServiceName, 0),
 		ServiceUpdateURL: serviceAddress + "/services",
+		HeartbeatURL: serviceAddress + "/heartbeat",
 	}
 	ctx, err := service.Start(
 		context.Background(),
@@ -28,13 +28,11 @@ func main() {
 		r,
 		log.RegisterHandlers,
 	)
-	if err != nil {
-		stdlog.Fatalln(err)
-	}
 
-	// 接受返回的contextDone — 返回一个 Channel，
-	// 这个 Channel 会在当前工作完成或者上下文被取消后关闭，
-	// 多次调用 Done 方法会返回同一个 Channel；
+	if err != nil {
+		stlog.Fatalln(err)
+	}
 	<-ctx.Done()
-	fmt.Println("shutting down log service.")
+
+	fmt.Println("Shutting down log service.")
 }

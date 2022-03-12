@@ -1,3 +1,3 @@
-module test.com
+module distributed
 
-go 1.17
+go 1.15

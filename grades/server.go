@@ -16,12 +16,11 @@ func RegisterHandlers() {
 	http.Handle("/students/", handler)
 }
 
-// 内部使用的studentHandler
 type studentsHandler struct{}
 
 // /students
-// /students/{1}
-// /students/{1}/grades
+// /students/{id}
+// /students/{id}/grades
 func (sh studentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	pathSegments := strings.Split(r.URL.Path, "/")
 	switch len(pathSegments) {
@@ -46,32 +45,11 @@ func (sh studentsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// 获取全部学生
 func (sh studentsHandler) getAll(w http.ResponseWriter, r *http.Request) {
 	studentsMutex.Lock()
 	defer studentsMutex.Unlock()
-	// 辅助方法
+
 	data, err := sh.toJSON(students)
-	if err != nil {
-		w.WriteHeader((http.StatusInternalServerError))
-		log.Printf("Failed to serialize student: %q", err)
-		return
-	}
-	w.Header().Add("Content-Type", "application/json")
-	w.Write(data)
-}
-
-// 获取一个学生
-func (sh studentsHandler) getOne(w http.ResponseWriter, r *http.Request, id int) {
-	studentsMutex.Lock()
-	defer studentsMutex.Unlock()
-
-	student, err := students.GetById(id)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	data, err := sh.toJSON(student)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Println(err)
@@ -81,44 +59,62 @@ func (sh studentsHandler) getOne(w http.ResponseWriter, r *http.Request, id int)
 	w.Write(data)
 }
 
-// 添加成绩
-func (sh studentsHandler) addGrade(w http.ResponseWriter, r *http.Request, id int) {
+func (sh studentsHandler) getOne(w http.ResponseWriter, r *http.Request, id int) {
 	studentsMutex.Lock()
 	defer studentsMutex.Unlock()
 
-	student, err := students.GetById(id)
+	student, err := students.GetByID(id)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		log.Println(err)
 		return
 	}
 
-	grade := Grade{}
-	decoder := json.NewDecoder(r.Body)
-	err = decoder.Decode(&grade)
+	data, err := sh.toJSON(student)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("Failed to serialize student: %q", err)
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.Write(data)
+}
+
+func (sh studentsHandler) addGrade(w http.ResponseWriter, r *http.Request, id int) {
+	studentsMutex.Lock()
+	defer studentsMutex.Unlock()
+
+	student, err := students.GetByID(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		log.Println(err)
+		return
+	}
+	var g Grade
+	dec := json.NewDecoder(r.Body)
+	err = dec.Decode(&g)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		log.Println(err)
 		return
 	}
-	student.Grades = append(student.Grades, grade)
+	student.Grades = append(student.Grades, g)
 	w.WriteHeader(http.StatusCreated)
-	data, err := sh.toJSON(grade)
+	data, err := sh.toJSON(g)
 	if err != nil {
 		log.Println(err)
+		return
 	}
-
-	w.Header().Add("Content-Type", "application/json")
+	w.Header().Add("Content-Type", "applicaiton/json")
 	w.Write(data)
 }
 
-// 空接口？？？不是很懂这里
 func (sh studentsHandler) toJSON(obj interface{}) ([]byte, error) {
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)
 	err := enc.Encode(obj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to serialize students: %q", err)
+		return nil, fmt.Errorf("Failed to serialize students: %q", err)
 	}
 	return b.Bytes(), nil
 }

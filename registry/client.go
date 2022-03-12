@@ -12,37 +12,43 @@ import (
 )
 
 func RegisterService(r Registration) error {
+	heartbeatURL, err := url.Parse(r.HeartbeatURL)
+	if err != nil {
+		return err
+	}
+	http.HandleFunc(heartbeatURL.Path, func (w http.ResponseWriter, r *http.Request)  {
+		w.WriteHeader(http.StatusOK)
+	})
+
 	serviceUpdateURL, err := url.Parse(r.ServiceUpdateURL)
 	if err != nil {
 		return err
 	}
-	// 处理服务发现请求
-	http.Handle(serviceUpdateURL.Path, &serviceUpdateURLHandler{})
+	http.Handle(serviceUpdateURL.Path, &serviceUpdateHanlder{})
 
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	err = enc.Encode(r)
 	if err != nil {
-		return nil
+		return err
 	}
 
-	//
 	res, err := http.Post(ServicesURL, "application/json", buf)
 	if err != nil {
 		return err
 	}
+
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to register service. Registry service "+" responded with code %v", res.StatusCode)
+		return fmt.Errorf("Failed to register service. Registry service "+
+			"responded with code %v", res.StatusCode)
 	}
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
-type serviceUpdateURLHandler struct{}
+type serviceUpdateHanlder struct{}
 
-func (suh serviceUpdateURLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (suh serviceUpdateHanlder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -55,11 +61,13 @@ func (suh serviceUpdateURLHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	fmt.Printf("Updated received %v\n", p)
 	prov.Update(p)
 }
 
 func ShutdownService(url string) error {
-	req, err := http.NewRequest(http.MethodDelete, ServicesURL, bytes.NewBuffer([]byte(url)))
+	req, err := http.NewRequest(http.MethodDelete, ServicesURL,
+		bytes.NewBuffer([]byte(url)))
 	if err != nil {
 		return err
 	}
@@ -69,7 +77,8 @@ func ShutdownService(url string) error {
 		return err
 	}
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to shutdown service. Registry service "+"responded with code %v", res.StatusCode)
+		return fmt.Errorf("Failed to deregister service. Registry "+
+			"service responded with code %v", res.StatusCode)
 	}
 	return nil
 }
@@ -82,33 +91,31 @@ type providers struct {
 func (p *providers) Update(pat patch) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	// 新增的部分
+
 	for _, patchEntry := range pat.Added {
 		if _, ok := p.services[patchEntry.Name]; !ok {
 			p.services[patchEntry.Name] = make([]string, 0)
 		}
-		// 存在就直接加在后面即可
-		p.services[patchEntry.Name] = append(p.services[patchEntry.Name], patchEntry.URL)
+		p.services[patchEntry.Name] = append(p.services[patchEntry.Name],
+			patchEntry.URL)
 	}
 
 	for _, patchEntry := range pat.Removed {
-		if providerURLS, ok := p.services[patchEntry.Name]; ok {
-			for i, url := range providerURLS {
-				if url == patchEntry.URL {
-					p.services[patchEntry.Name] = append(providerURLS[:i], providerURLS[i+1:]...)
-					break
+		if providerURLs, ok := p.services[patchEntry.Name]; ok {
+			for i := range providerURLs {
+				if providerURLs[i] == patchEntry.URL {
+					p.services[patchEntry.Name] = append(providerURLs[:i],
+						providerURLs[i+1:]...)
 				}
 			}
 		}
 	}
-
 }
 
-// 在本系统中只有一个service， grade
 func (p providers) get(name ServiceName) (string, error) {
 	providers, ok := p.services[name]
 	if !ok {
-		return "", fmt.Errorf("no provider found for service %s", name)
+		return "", fmt.Errorf("No providers available for service %v", name)
 	}
 	idx := int(rand.Float32() * float32(len(providers)))
 	return providers[idx], nil

@@ -1,6 +1,5 @@
 package grades
 
-// 模拟学生数据
 func init() {
 	students = []Student{
 		{
@@ -28,7 +27,7 @@ func init() {
 		{
 			ID:        2,
 			FirstName: "Roberto",
-			LastName:  "Smith",
+			LastName:  "Baggio",
 			Grades: []Grade{
 				{
 					Title: "Quiz 1",
