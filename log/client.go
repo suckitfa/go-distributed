@@ -9,7 +9,7 @@ import (
 	"test.com/registry"
 )
 
-func SetClient(serviceURL string, clientService registry.ServiceName) {
+func SetClientLogger(serviceURL string, clientService registry.ServiceName) {
 	stdlog.SetPrefix(fmt.Sprintf("[%s] ", clientService))
 	stdlog.SetFlags(0)
 	stdlog.SetOutput(&clientLogger{url: serviceURL})
