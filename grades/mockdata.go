@@ -28,7 +28,7 @@ func init() {
 		{
 			ID:        2,
 			FirstName: "Roberto",
-			LastName:  "Baggio",
+			LastName:  "Smith",
 			Grades: []Grade{
 				{
 					Title: "Quiz 1",

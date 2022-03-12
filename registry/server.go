@@ -16,27 +16,66 @@ const ServicesURL = "http://localhost" + ServerPort + "/services"
 
 type registry struct {
 	registrations []Registration
-	mutext        *sync.RWMutex
+	mutex         *sync.RWMutex
 	// 保证线程安全,动态变化，加上互斥锁
 }
 
 func (r *registry) add(reg Registration) error {
 	// 上锁
-	r.mutext.Lock()
+	r.mutex.Lock()
 	r.registrations = append(r.registrations, reg)
-	r.mutext.Unlock()
+	r.mutex.Unlock()
 	// 发送请求:通知所有的依赖服务
 	err := r.sendRequiredServices(reg)
-	if err != nil {
-		return err
-	}
-	return nil
+	// 发送请求:通知服务更新
+	r.notify(patch{
+		Added: []pathEntry{
+			{
+				Name: reg.ServiceName,
+				URL:  reg.ServiceURL,
+			},
+		},
+	})
+	return err
 }
 
+func (r registry) notify(fullPatch patch) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	for _, reg := range r.registrations {
+		// 并发发送通知
+		go func(reg Registration) {
+			for _, reqService := range reg.RequiredServices {
+				p := patch{Added: []pathEntry{}, Removed: []pathEntry{}}
+				sendUpdate := false
+				for _, added := range fullPatch.Added {
+					if added.Name == reqService {
+						p.Added = append(p.Added, added)
+						sendUpdate = true
+					}
+				}
+				for _, removed := range fullPatch.Removed {
+					if removed.Name == reqService {
+						p.Removed = append(p.Removed, removed)
+						sendUpdate = true
+					}
+				}
+				if sendUpdate {
+					err := r.sendPatch(p, reg.ServiceUpdateURL)
+					if err != nil {
+						log.Println(err)
+					}
+				}
+			}
+
+		}(reg)
+	}
+
+}
 func (r registry) sendRequiredServices(reg Registration) error {
 	// 上读的锁
-	r.mutext.RLock()
-	defer r.mutext.RUnlock()
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
 
 	var p patch
 	for _, serviceReg := range r.registrations {
@@ -65,10 +104,10 @@ func (r registry) sendPatch(p patch, url string) error {
 func (r *registry) remove(url string) error {
 	for i := range r.registrations {
 		if reg.registrations[i].ServiceURL == url {
-			r.mutext.Lock()
+			r.mutex.Lock()
 			// 删除index为i的元素
 			reg.registrations = append(reg.registrations[:i], r.registrations[i+1:]...)
-			r.mutext.Unlock()
+			r.mutex.Unlock()
 		}
 	}
 	return fmt.Errorf("no service found with URL: %s", url)
@@ -76,7 +115,7 @@ func (r *registry) remove(url string) error {
 
 var reg = registry{
 	registrations: make([]Registration, 0),
-	mutext:        new(sync.RWMutex),
+	mutex:         new(sync.RWMutex),
 }
 
 // 空struct
